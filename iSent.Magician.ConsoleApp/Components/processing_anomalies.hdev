@@ -1,0 +1,585 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="25.11.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<l>list_image_files('C:/Users/fabio.miranda/OneDrive - INTROSYS SA/Magician/magician_images','default', [], ImageFiles)</l>
+<l>list_image_files('C:/Users/fabio.miranda/OneDrive - INTROSYS SA/Magician/single_shot_new_tool_23-03-26/sample11','default', [], ImageFiles)</l>
+<l>list_image_files('C:/Users/fabio.miranda/OneDrive - INTROSYS SA/Magician/Datasets/selected_datasets_MAGICIAN/IntrosysDatasets/full_image12MP/','default', 'recursive', ImageFiles)</l>
+<l>gen_empty_obj(AbnormalRegions1)</l>
+<l>gen_empty_obj(AbnormalRegions2)</l>
+<l>gen_empty_obj(AbnormalRegions3)</l>
+<c></c>
+<l>for Index := 0 to |ImageFiles|-1 by 1</l>
+<l>    read_image(Image, ImageFiles[Index])</l>
+<c>    </c>
+<c>    *clean the image from part edges and background?</c>
+<c>    *ignore margin/edge long lines meaning its a part limit?</c>
+<l>    *RemovePartEdges(Image, PartInspectionImage)</l>
+<c>  </c>
+<l>    get_image_size (Image, Width, Height)</l>
+<l>    dev_display(Image)</l>
+<l>    dev_set_draw('margin')</l>
+<c>    </c>
+<l>*     threshold(Image, Region, 100, 180)</l>
+<l>*     edges_sub_pix(Image, Edges, 'canny', 3, 7, 40)</l>
+<l>*     select_shape_xld(Edges, SelectedXLD, 'contlength', 'and', 3000, 999999)</l>
+<l>*     fit_rectangle2_contour_xld(SelectedXLD, 'regression', -1, 0, 0, 3, 2, Row, Column, Phi, Length1, Length2, PointOrder)</l>
+<l>*     gen_rectangle2(Rectangle, Row, Column, Phi, Length1, Length2)</l>
+<l>*     erosion_rectangle1(Rectangle, Rectangle, 150, 150)</l>
+<l>*     reduce_domain(Image, Rectangle, Image)</l>
+<c>    </c>
+<c>    *image conditions pre processing / enhancement</c>
+<c>    *enhances the contrast by histogram normalization</c>
+<l>    equ_histo_image(Image, ImageEquHisto)</l>
+<l>*     equ_histo_image_rect(ImageEquHisto, ImageEquHisto1, 'accurate', 21, 21, 0.005)</l>
+<l>*     equ_histo_image_rect(ImageEquHisto, ImageEquHisto1, 'accurate', 21, 21, 0.0275)</l>
+<c>    *if the first equ isn't sufficient.</c>
+<l>    equ_histo_image_rect(ImageEquHisto, ImageEquHisto1, 'fast', 45, 45, 0.01)</l>
+<l>    *equ_histo_image_rect(ImageEquHisto, ImageEquHisto1, 'fast', 21, 21, 0.03)</l>
+<c>    </c>
+<c></c>
+<c>    *use dieffence of gauss first to extract some abnormal zones</c>
+<l>    DoG_signal_processing(ImageEquHisto1, AbnormalRegions1)</l>
+<l>    dev_display(AbnormalRegions1)</l>
+<c>    </c>
+<c>    ****try frequency FFT algorithms****************************************************************</c>
+<c>    * First Optimize the fft speed for the specific image size</c>
+<l>    optimize_rft_speed (Width, Height, 'standard')</l>
+<c>    </c>
+<c>    ****try with sin bandpass filter****************************************************************</c>
+<c>    </c>
+<l>    FFT_sin_bandpass_signal_processing(Image, AbnormalRegions2)</l>
+<c>    </c>
+<c>    ****try with gauss dif bandpass filter****************************************************************</c>
+<l>    FFT_Gauss_signal_processing (Image, AbnormalRegions3)</l>
+<c>    </c>
+<c>    *****check if the defect regions of the two algorithms match/intersect or are complementary</c>
+<c>    *note: by intersecting, the algorithm that detects less defects is the one that limits detection capacity!</c>
+<l>    *intersection(AbnormalRegions1, AbnormalRegions2, AllSalientInsersectedRegions)</l>
+<l>    *intersection(AllSalientInsersectedRegions, AbnormalRegions3, AllSalientInsersectedRegions)</l>
+<c>    </c>
+<c>    *instead of intersection, add the regions of all algorithms </c>
+<l>    UniteAllPotentialAnomalies(AbnormalRegions1, AbnormalRegions2, AbnormalRegions3, AllSalientUniteddRegions, AllSalientSeparatedRegions)</l>
+<c></c>
+<c>    *****mosaicking -&gt; generate rectagle ROI from the abnormal regions</c>
+<c>    *choose tile size</c>
+<l>    TileWidth := 256</l>
+<l>    TileHeight := 256</l>
+<c>    *approach 1 - generate smallest rectangles in all defects and then check and remove overlap</c>
+<c>    *ATENTION - THERE's a problema when rectangles overlap in a big region... split it into grid? </c>
+<l>    *Mosaicking_defects_centered (Image, AllSalientSeparatedRegions, SelectedImageCroppedTiles, SelectedRegionTiles, TileWidth, TileHeight)</l>
+<l>    *dev_display(SelectedRegionTiles)</l>
+<c>    </c>
+<c>    *****approach 2 - generate fixed grid of rectangles/tiles in all defects and select only tiles that contain defects************</c>
+<c></c>
+<l>    *Mosaicking_grid (Image, AllSalientSeparatedRegions, SelectedImageCroppedTiles2, SelectedRegionTiles2, TileWidth, TileHeight)</l>
+<l>    OptimizedMosaickingGrid (Image, AllSalientSeparatedRegions, SelectedImageCroppedTiles2, SelectedRegionTiles2, TileWidth, TileHeight)</l>
+<c>    </c>
+<l>    dev_display(Image)</l>
+<l>    dev_display(SelectedRegionTiles2)</l>
+<c>    </c>
+<c>    *save all crops into the respective sample crop folder*****************************</c>
+<l>*     path:=ImageFiles[Index]</l>
+<l>*     tuple_strrstr(path,'sample', PositionStart)</l>
+<l>*     tuple_substr(path, PositionStart, PositionStart+8, Substring)</l>
+<l>*     tuple_strrstr(Substring,'/', RelPositionEnd)</l>
+<l>*     tuple_substr(Substring, 0, RelPositionEnd-1, SampleSubstring)</l>
+<l>*     croppedTileFilePath:='C:/Users/fabio.miranda/OneDrive - INTROSYS SA/Magician/Datasets/selected_datasets_MAGICIAN/IntrosysDatasets/Cropped_256/mosaics_per_sample/'+SampleSubstring+'/'</l>
+<l>*     count_obj(SelectedImageCroppedTiles2, Number)</l>
+<l>*     get_system_time(MSecond, Second, Minute, Hour, Day, YDay, Month, Year)</l>
+<l>*     for Index1 := 1 to Number by 1</l>
+<l>*         select_obj(SelectedImageCroppedTiles2, SelectedTile, Index1)</l>
+<l>        *write_image_metadata('tiff', 'tiff_image_description', croppedTileFilePath, ImageFiles)</l>
+<l>        *write_image(SelectedTile, 'bmp', 0, croppedTileFilePath+SampleSubstring+'_CropIDX'+Index1+'_ID'+Minute+MSecond+Second)</l>
+<c>    *CORRER ISTO DE NOVO COM O SAMPLE NAME. IGNORAR O SAMPLE 1 que já está anotado.</c>
+<l>*     endfor</l>
+<l>endfor</l>
+<c></c>
+<l>stop()</l>
+<c></c>
+<c>*********************OTHER TESTS******************************</c>
+<c>*mean_curvature_flow(Image, ImageMCF, 0, 0.5, 10)*takes too long</c>
+<c>*coherence_enhancing_diff(Image, ImageCED, 0.5, 3, 0.5, 10) *takes too long</c>
+<c>*process anomalies*</c>
+<c></c>
+<l>* mask:=0</l>
+<l>* for Index1 := 1 to 5 by 1</l>
+<l>* mask:=mask + 5</l>
+<l>* equ_histo_image_rect(ImageEquHisto, ImageEquHisto1, 'accurate', mask, mask, 0.005)</l>
+<l>* wait_seconds(1)</l>
+<l>* endfor</l>
+<l>* contrast:=0</l>
+<l>* for Index1 := 1 to 55 by 1</l>
+<l>* contrast:=contrast + 0.0005</l>
+<l>* equ_histo_image_rect(ImageEquHisto, ImageEquHisto1, 'accurate', 21, 21, contrast)</l>
+<l>* wait_seconds(0.1)</l>
+<l>* stop()</l>
+<l>* endfor</l>
+<l>* scale_image_max(Image, ImageScaleMax)</l>
+<c></c>
+<l>*zero_crossing (DiffOfGauss, RegionCrossing1)</l>
+<l>stop ()</l>
+<l>laplace_of_gauss (Image, ImageLaplace, 5)</l>
+<l>zero_crossing (ImageLaplace, RegionCrossing2)</l>
+<l>stop ()</l>
+<l>derivate_gauss (Image, DerivGauss, 5, 'laplace')</l>
+<l>zero_crossing (DerivGauss, RegionCrossing3)</l>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="DoG_signal_processing">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="AbnormalRegions" base_type="iconic" dimension="0"/>
+</oo>
+</interface>
+<body>
+<c>*diff gauss to enhance edges and ignore soft textures</c>
+<l>    diff_of_gauss (Image, DiffOfGauss, 4, 1.6)</l>
+<c>    *note: with 0.6 of SigFactor the defects turn black. is it better? we'll see</c>
+<c>    *check min max to segment bright regions</c>
+<l>    min_max_gray(DiffOfGauss, DiffOfGauss, 0, Min, Max, Range)</l>
+<c>    </c>
+<c>    *use max percentage treshold to segment brighter regions*************************</c>
+<l>    threshold(DiffOfGauss, AbnormalRegionsBright, Max-Max*0.75, Max)</l>
+<c>    *remove noisy regions</c>
+<l>    connection(AbnormalRegionsBright, AbnormalRegionsBright)</l>
+<l>    select_shape(AbnormalRegionsBright, AbnormalRegionsBright, 'area', 'and', 25, 9999999)</l>
+<c>    </c>
+<c>    *use min percentage treshold to segment darker regions****************************</c>
+<l>    threshold(DiffOfGauss, AbnormalRegionsDark, Min, Min*0.15)</l>
+<c>    *remove noisy regions</c>
+<l>    connection(AbnormalRegionsDark, AbnormalRegionsDark)</l>
+<l>    select_shape(AbnormalRegionsDark, AbnormalRegionsDark, 'area', 'and', 50, 9999999)</l>
+<c>    </c>
+<c>    *dilate brighter and darker regions to check where they intersect  - must certainly be a defect</c>
+<l>    dilation_circle(AbnormalRegionsDark, RegionDilationDark, 2.5)</l>
+<l>    dilation_circle(AbnormalRegionsBright, RegionDilationBright, 2.5)</l>
+<c>   </c>
+<l>    concat_obj(RegionDilationDark, RegionDilationBright, AbnormalRegionsDilated)</l>
+<l>    union1(AbnormalRegionsDilated, RegionUnion)</l>
+<l>    connection(RegionUnion, ConnectedRegions)</l>
+<c>    *check the bigger?</c>
+<l>    select_shape(ConnectedRegions, AbnormalRegions, 'area', 'and', 500, 9999999)</l>
+<c>    </c>
+<c>    *obsolete - this old code only considered the bright regions </c>
+<l>*     concat_obj(AbnormalRegionsBright, AbnormalRegionsDark, AbnormalRegions)</l>
+<l>*     connection(AbnormalRegions, ConnectedRegions)</l>
+<c>    *remove_noise_region: A structuring element consisting of the four 4-neighbors of a point is being used</c>
+<l>*     remove_noise_region(AbnormalRegions, OutputRegion, 'n_4')</l>
+<l>*     dilation_circle(AbnormalRegions, AbnormalRegions, 9.5)</l>
+<l>    return ()</l>
+</body>
+<docu id="DoG_signal_processing">
+<parameters>
+<parameter id="AbnormalRegions"/>
+<parameter id="Image"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="FFT_sin_bandpass_signal_processing">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="AbnormalRegions" base_type="iconic" dimension="0"/>
+</oo>
+</interface>
+<body>
+<l>invert_image (Image, ImageInverted)</l>
+<c>* Enhance the scratches by filtering in the frequency domain</c>
+<l>get_image_size(ImageInverted, Width, Height)</l>
+<l>gen_sin_bandpass (ImageBandpass, 0.4, 'none', 'rft', Width, Height)</l>
+<l>rft_generic (ImageInverted, ImageFFT, 'to_freq', 'none', 'complex', Width)</l>
+<l>convol_fft (ImageFFT, ImageBandpass, ImageConvol)</l>
+<l>rft_generic (ImageConvol, Lines, 'from_freq', 'n', 'byte', Width)</l>
+<c>* Segment the scratches by using morphology</c>
+<l>threshold (Lines, Region, 5, 255)</l>
+<l>connection (Region, ConnectedRegions)</l>
+<l>select_shape (ConnectedRegions, AbnormalRegions, 'area', 'and', 60, 9999999)</l>
+<l>*dilation_circle (SelectedRegions, AbnormalRegions, 3.5)</l>
+<l>return ()</l>
+</body>
+<docu id="FFT_sin_bandpass_signal_processing">
+<parameters>
+<parameter id="AbnormalRegions"/>
+<parameter id="Image"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="FFT_Gauss_signal_processing">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="AbnormalRegions" base_type="iconic" dimension="0"/>
+</oo>
+</interface>
+<body>
+<l>get_image_size(Image, Width, Height)    </l>
+<c>* Construct a suitable filter by combining two Gaussian</c>
+<c>* filters</c>
+<l>Sigma1 := 15.0</l>
+<l>Sigma2 := 0.1</l>
+<l>gen_gauss_filter (GaussFilter1, Sigma1, Sigma1, 0.0, 'none', 'rft', Width, Height)</l>
+<l>gen_gauss_filter (GaussFilter2, Sigma2, Sigma2, 0.0, 'none', 'rft', Width, Height)</l>
+<l>sub_image (GaussFilter1, GaussFilter2, Filter, 1, 0)</l>
+<c>* Perform the convolution in the frequency domain</c>
+<l>rft_generic (Image, ImageFFT, 'to_freq', 'none', 'complex', Width)</l>
+<l>convol_fft (ImageFFT, Filter, ImageConvol)</l>
+<l>rft_generic (ImageConvol, ImageFiltered, 'from_freq', 'n', 'real', Width)</l>
+<c></c>
+<c>* Process the filtered image</c>
+<l>invert_image(ImageFiltered, ImageInvert)</l>
+<l>min_max_gray (ImageInvert, ImageInvert, 0, Min, Max, Range)</l>
+<c>*select dark zones of the inverted image</c>
+<l>threshold(ImageInvert, AbnormalRegions, Min, Min*0.1)</l>
+<c></c>
+<l>connection(AbnormalRegions, AbnormalRegions)</l>
+<l>select_shape(AbnormalRegions, AbnormalRegions, 'area', 'and', 20, 9999999)</l>
+<l>*dilation_circle(AbnormalRegions, AbnormalRegions, 3.5)</l>
+<l>return ()</l>
+</body>
+<docu id="FFT_Gauss_signal_processing">
+<parameters>
+<parameter id="AbnormalRegions"/>
+<parameter id="Image"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="Mosaicking_defects_centered">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+<par name="AbnormalRegions" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="SelectedRegionTiles" base_type="iconic" dimension="0"/>
+<par name="SelectedImageCroppedTiles" base_type="iconic" dimension="0"/>
+</oo>
+<ic>
+<par name="TileWidth" base_type="ctrl" dimension="0"/>
+<par name="TileHeight" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<l>area_defects := []</l>
+<l>row_min := []</l>
+<l>col_min := []</l>
+<l>row_max := []</l>
+<l>col_max := []</l>
+<l>smallest_rectangle1(AbnormalRegions, row_min, col_min, row_max, col_max)</l>
+<l>connection(AbnormalRegions, AbnormalRegions)</l>
+<c></c>
+<l>gen_empty_obj(Rectangles)</l>
+<c></c>
+<l>for i := 0 to |row_min|-1 by 1</l>
+<c>    * Compute center of the defect's bounding box</c>
+<l>    RowC := (row_min[i] + row_max[i]) / 2</l>
+<l>    ColC := (col_min[i] + col_max[i]) / 2</l>
+<c>    </c>
+<c>    * Create a fixed-size rectangle centered on this defect</c>
+<l>    gen_rectangle2(RectTemp, RowC, ColC, 0, TileWidth/2, TileHeight/2)</l>
+<c>    * Clip if needed to ensure rectangle is inside the image</c>
+<l>    reduce_domain(Image, RectTemp, ImageClipped)</l>
+<c>    * Collect rectangles</c>
+<l>    concat_obj(Rectangles, RectTemp, Rectangles)</l>
+<l>endfor</l>
+<c></c>
+<c>*now merge rectangles to avoid overlaps</c>
+<c></c>
+<c>* Convert Rectangles to one union region</c>
+<l>union1(Rectangles, RectUnion)</l>
+<c>* Split into connected components (each component = overlapping fixed rectangles)</c>
+<l>connection(RectUnion, RectGroups)</l>
+<l>count_obj(RectGroups, NumberRect)</l>
+<l>NumGroups := NumberRect</l>
+<c></c>
+<l>gen_empty_obj (SelectedRegionTiles)</l>
+<l>for g := 1 to NumGroups by 1</l>
+<l>    select_obj(RectGroups, Rg, g)</l>
+<l>    smallest_rectangle1(Rg, r1, c1, r2, c2)</l>
+<c>    </c>
+<l>    RowC := (r1 + r2) / 2</l>
+<l>    ColC := (c1 + c2) / 2</l>
+<c>    </c>
+<c>    * Generate final non-overlapping fixed rectangle</c>
+<l>    gen_rectangle2(RectG, RowC, ColC, 0, TileWidth/2, TileHeight/2)</l>
+<l>    concat_obj (SelectedRegionTiles, RectG, SelectedRegionTiles)</l>
+<l>endfor</l>
+<c></c>
+<c>*Crop patches for CNN input</c>
+<l>gen_empty_obj (SelectedImageCroppedTiles)</l>
+<l>count_obj(SelectedRegionTiles, TilesNumber)</l>
+<c></c>
+<l>for i := 1 to TilesNumber by 1</l>
+<l>    select_obj(SelectedRegionTiles, Rc, i)</l>
+<l>    reduce_domain(Image, Rc, Patch)</l>
+<l>    crop_domain(Patch, PatchCropped)</l>
+<l>    concat_obj (SelectedImageCroppedTiles, PatchCropped, SelectedImageCroppedTiles)</l>
+<l>endfor</l>
+<c></c>
+<l>return ()</l>
+</body>
+<docu id="Mosaicking_defects_centered">
+<parameters>
+<parameter id="AbnormalRegions"/>
+<parameter id="Image"/>
+<parameter id="SelectedImageCroppedTiles"/>
+<parameter id="SelectedRegionTiles"/>
+<parameter id="TileHeight"/>
+<parameter id="TileWidth"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="Mosaicking_grid">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+<par name="AbnormalRegions" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="SelectedImageCroppedTiles" base_type="iconic" dimension="0"/>
+<par name="SelectedRegionTiles" base_type="iconic" dimension="0"/>
+</oo>
+<ic>
+<par name="TileWidth" base_type="ctrl" dimension="0"/>
+<par name="TileHeight" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<l>get_image_size(Image, W, H)</l>
+<c></c>
+<l>RowCount := H / TileHeight</l>
+<l>ColCount := W / TileWidth</l>
+<c></c>
+<l>gen_empty_obj(SelectedRegionTiles)</l>
+<c></c>
+<l>for r := 0 to RowCount-1 by 1</l>
+<l>    for c := 0 to ColCount-1 by 1</l>
+<l>        Row1 := r * TileHeight</l>
+<l>        Row2 := Row1 + TileHeight - 1</l>
+<l>        Col1 := c * TileWidth</l>
+<l>        Col2 := Col1 + TileWidth - 1</l>
+<c>        </c>
+<l>        gen_rectangle1(Tile, Row1, Col1, Row2, Col2)</l>
+<l>        intersection(Tile, AbnormalRegions, IntersectionDefectsWithTiles)</l>
+<l>        area_center(IntersectionDefectsWithTiles, Area, Row, Column)</l>
+<c>        </c>
+<l>        if(Area &gt; 0)</l>
+<l>            concat_obj(SelectedRegionTiles, Tile, SelectedRegionTiles)</l>
+<l>        endif</l>
+<l>    endfor</l>
+<l>endfor</l>
+<c>*display tiles to feed CNN</c>
+<l>dev_display(SelectedRegionTiles)</l>
+<c></c>
+<c>*Crop patches for CNN input</c>
+<l>gen_empty_obj (SelectedImageCroppedTiles)</l>
+<l>count_obj(SelectedRegionTiles, TilesNumber)</l>
+<c></c>
+<l>for i := 1 to TilesNumber by 1</l>
+<l>    select_obj(SelectedRegionTiles, Rc, i)</l>
+<l>    reduce_domain(Image, Rc, Patch)</l>
+<l>    crop_domain(Patch, PatchCropped)</l>
+<l>    concat_obj (SelectedImageCroppedTiles, PatchCropped, SelectedImageCroppedTiles)</l>
+<l>endfor</l>
+<c></c>
+<c>*highly optimized:</c>
+<c></c>
+<l>gen_grid_region(RegionGrid, TileHeight, TileWidth, 'lines', W, H)</l>
+<l>difference(Image, RegionGrid, RegionDifference)</l>
+<l>connection(RegionDifference, ConnectedRegions)</l>
+<l>* intersection(RegionGrid, AbnormalRegions, TilesWithDefects)</l>
+<l>*intersection(AbnormalRegions,ConnectedRegions, TilesWithDefects)</l>
+<c></c>
+<l>* select_shape(TilesWithDefects, SelectedRegionTiles, 'area', 'and', 1, 9000000000)</l>
+<c></c>
+<c>* Crop patches</c>
+<l>* reduce_domain(Image, SelectedRegionTiles, ImageReduced)</l>
+<l>* crop_domain(ImageReduced, SelectedImageCroppedTiles)</l>
+<l>*gen_empty_obj(SelectedImageCroppedTiles)</l>
+<c></c>
+<l>*count_obj(SelectedRegionTiles, TilesNumber)</l>
+<c></c>
+<l>* for i := 1 to TilesNumber by 1</l>
+<l>*     select_obj(TilesWithDefects, Rc, i)</l>
+<l>*     reduce_domain(Image, Rc, Patch)</l>
+<l>*     crop_domain(Patch, PatchCropped)</l>
+<l>*     concat_obj(SelectedImageCroppedTiles, PatchCropped, SelectedImageCroppedTiles)</l>
+<l>* endfor</l>
+<c></c>
+<c></c>
+<l>return ()</l>
+</body>
+<docu id="Mosaicking_grid">
+<parameters>
+<parameter id="AbnormalRegions"/>
+<parameter id="Image"/>
+<parameter id="SelectedImageCroppedTiles"/>
+<parameter id="SelectedRegionTiles"/>
+<parameter id="TileHeight"/>
+<parameter id="TileWidth"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="RemovePartEdges">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="PartInspectionImage" base_type="iconic" dimension="0"/>
+</oo>
+</interface>
+<body>
+<l>*bandpass_image(Image, ImageBandpass, 'lines')</l>
+<l>threshold(Image, Region, 0, 60)</l>
+<l>dilation_circle(Region, RegionDilation, 3.5)</l>
+<l>connection(RegionDilation, ConnectedRegions)</l>
+<l>area_center(ConnectedRegions, Area, Row, Column)</l>
+<c></c>
+<l>tuple_sort_index(Area, Indices)</l>
+<l>tuple_max(Area, Max)</l>
+<l>if(Max&gt;200000)</l>
+<l>    bigger_area_obj_index:=Indices[|Indices|-1]</l>
+<l>    select_obj(ConnectedRegions, ObjectSelected, bigger_area_obj_index+1)</l>
+<l>    regiongrowing(Image, Regions, 3, 3, 3, 4000)</l>
+<l>    intersection(Regions, ObjectSelected, RegionIntersection)</l>
+<c>    *selecionar as regiongorwing que tocam no fundo preto</c>
+<l>endif</l>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<l>return ()</l>
+</body>
+<docu id="RemovePartEdges">
+<parameters>
+<parameter id="Image"/>
+<parameter id="PartInspectionImage"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="UniteAllPotentialAnomalies">
+<interface>
+<io>
+<par name="AbnormalRegions1" base_type="iconic" dimension="0"/>
+<par name="AbnormalRegions2" base_type="iconic" dimension="0"/>
+<par name="AbnormalRegions3" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="AllAbnormalRegionsUnited" base_type="iconic" dimension="0"/>
+<par name="AllAbnormalRegionsSeparated" base_type="iconic" dimension="0"/>
+</oo>
+</interface>
+<body>
+<c>*Juntar todos os objetos num único tuplo</c>
+<l>concat_obj (AbnormalRegions1, AbnormalRegions2, ObjectsConcat)</l>
+<l>concat_obj (ObjectsConcat, AbnormalRegions3, AllObjects)</l>
+<c></c>
+<c>*Unir tudo de uma vez</c>
+<l>union1 (AllObjects, AllAbnormalRegionsUnited)</l>
+<c></c>
+<c>*Limpar ruído antes do connection</c>
+<l>opening_circle (AllAbnormalRegionsUnited, RegionOpening, 1.5)</l>
+<c></c>
+<c>*Separar apenas o que interessa</c>
+<l>connection (RegionOpening, AllAbnormalRegionsSeparated)</l>
+<l>return ()</l>
+</body>
+<docu id="UniteAllPotentialAnomalies">
+<parameters>
+<parameter id="AbnormalRegions1"/>
+<parameter id="AbnormalRegions2"/>
+<parameter id="AbnormalRegions3"/>
+<parameter id="AllAbnormalRegionsSeparated"/>
+<parameter id="AllAbnormalRegionsUnited"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="OptimizedMosaickingGrid">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+<par name="AbnormalRegions" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="SelectedImageCroppedTiles" base_type="iconic" dimension="0"/>
+<par name="SelectedRegionTiles" base_type="iconic" dimension="0"/>
+</oo>
+<ic>
+<par name="TileWidth" base_type="ctrl" dimension="0"/>
+<par name="TileHeight" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<c></c>
+<l>* dilation_circle(AbnormalRegions, RegionsDilated, TileWidth/2)</l>
+<l>* smallest_rectangle1(RegionsDilated, Row1, Col1, Row2, Col2)</l>
+<c></c>
+<l>* TileRow1 := floor(Row1 / TileHeight)</l>
+<l>* TileCol1 := floor(Col1 / TileWidth)</l>
+<c></c>
+<l>* TileRow2 := floor(Row2 / TileHeight)</l>
+<l>* TileCol2 := floor(Col2 / TileWidth)</l>
+<c></c>
+<l>* Rows1 := TileRow1 * TileHeight</l>
+<l>* Cols1 := TileCol1 * TileWidth</l>
+<c></c>
+<l>* Rows2 := (TileRow2 + 1) * TileHeight - 1</l>
+<l>* Cols2 := (TileCol2 + 1) * TileWidth - 1</l>
+<c></c>
+<l>* gen_rectangle1(SelectedRegionTiles, Rows1, Cols1, Rows2, Cols2)</l>
+<c></c>
+<c></c>
+<l>* reduce_domain(Image, SelectedRegionTiles, ImageReduced)</l>
+<l>* crop_domain(ImageReduced, SelectedImageCroppedTiles)</l>
+<c></c>
+<l>get_image_size (Image, W, H)</l>
+<l>gen_grid_region (RegionGrid, TileHeight, TileWidth, 'lines', W, H)</l>
+<c></c>
+<l>difference(Image, RegionGrid, RegionDifference)</l>
+<l>connection(RegionDifference, ConnectedRegions)</l>
+<c></c>
+<l>select_shape_proto (ConnectedRegions, AbnormalRegions, SelectedRegionTiles, 'overlaps_rel', 0.001, 100)</l>
+<c>*reduce domain only return the first region? wtf</c>
+<l>*reduce_domain(Image, SelectedRegionTiles, ImageReduced)</l>
+<l>*crop_domain(ImageReduced, ImagePart)</l>
+<c></c>
+<l>gen_empty_obj (SelectedImageCroppedTiles)</l>
+<l>area_center (SelectedRegionTiles, Area1, Row, Column)</l>
+<l>*area_center (ConnectedRegions, Area1, Row, Column)</l>
+<l>if (|Area1| &gt; 0)</l>
+<c>    * Calcula as coordenadas para o crop em vetor</c>
+<l>    R1 := Row - (TileHeight / 2)</l>
+<l>    C1 := Column - (TileWidth / 2)</l>
+<l>    R2 := R1 + TileHeight - 1</l>
+<l>    C2 := C1 + TileWidth - 1</l>
+<l>    crop_rectangle1 (Image, SelectedImageCroppedTiles, R1, C1, R2, C2)</l>
+<c>    *use this to garantee patch size for the CNN</c>
+<l>    *change_format(SelectedImageCroppedTiles, ImagePart1, W, H)</l>
+<l>endif</l>
+<l>return ()</l>
+</body>
+<docu id="OptimizedMosaickingGrid">
+<parameters>
+<parameter id="AbnormalRegions"/>
+<parameter id="Image"/>
+<parameter id="SelectedImageCroppedTiles"/>
+<parameter id="SelectedRegionTiles"/>
+<parameter id="TileHeight"/>
+<parameter id="TileWidth"/>
+</parameters>
+</docu>
+</procedure>
+</hdevelop>

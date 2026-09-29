@@ -1,0 +1,9 @@
+host: "127.0.0.1"
+port: 1883
+robot_topics_mqtt:
+  - "robot/position"
+  - "robot/speed"
+  - "robot/cobot_mode"
+  - "robot/sensing/finished"
+  - "robot/sensing/active"
+inspection_mqtt_topic: "inspection/result"
